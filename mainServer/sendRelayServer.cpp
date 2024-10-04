@@ -10,8 +10,35 @@
 
 using namespace std;
 
+/**********
+ * 以下シグナルハンドラの設定
+ * ********/
+
+volatile sig_atomic_t stopF = 0;
+
+void signalHandler(int signum)
+{
+	cout << "\nStopping the program..." << endl;
+	stopF = 1;
+}
+
+/***********
+ * UDP用ソケットを作成
+ * 失敗した場合-1を返す
+ * *********/
+int makeSocketUDP()
+{
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	return sockfd;
+}
+
 int sendRelayServer(int sockfd, const char *RelayIP, int RelayPort)
 {
+	// シグナルハンドラの設定
+	signal(SIGINT, signalHandler);
+	signal(SIGTERM, signalHandler);
+
 	const char *msg = "Hello Server";
 	struct sockaddr_in serverAddr;
 	int sentResult, failCount;
