@@ -12,6 +12,6 @@ void signalHandler(int signum);
 
 // 関数の宣言
 int makeSocketUDP();
-int reception(int sockfd, int openPort)
+int reception(int sockfd, int openPort);
 
 #endif

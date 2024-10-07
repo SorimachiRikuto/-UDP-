@@ -4,62 +4,69 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
-#include <errno>
+#include <errno.h>
+#include <signal.h>
 #include "openUdp.h"
 
 using namespace std;
 
-/**********
- * 以下シグナルハンドラの設定
- * ********/
 volatile sig_atomic_t stopF = 0;
 
 void signalHandler(int signum)
 {
-	cout << "\nStopping the program..." << endl;
-	stopF = 1;
+    cout << "\nStopping the program..." << endl;
+    stopF = 1;
 }
 
-/**********
- * UDP用のソケット作成
- * 作成したソケットを返し、失敗した場合-1を返す
- * ********/
 int makeSocketUDP()
 {
-	int sockfd = sockfd(AF_INET, AF_INET, 0)
-
-	return sockfd;
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0); // 修正ポイント
+    return sockfd;
 }
 
-/**********
- * UDP受信部分(Aliveメッセージ)
- * 成功時は0,エラー発生時は-1を返す
- * ********/
 int reception(int sockfd, int openPort)
 {
-	struct sockaddr_in localAddr;
+    // シグナルハンドラの設定
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
 
-	// アドレスの設定
-	memset(&localAddr, 0, sizeof(localAddr)) // localAdderの中をからにする
-	localAddr.sin_family = AF_INET; // UDP
-	localAddr.sin_port = htons(openPort); // リッスンするポート番号の指定
-	localAddr.sin_addr.s_addr = INADDR_ANY; // 任意のアドレス
+    int result;
+    char buffer[1024];
+    struct sockaddr_in localAddr, clientAddr;
+    socklen_t addrLen = sizeof(clientAddr);
 
-	// バインドの実行,エラーが発生した場合エラー内容を表示させ,ソケットを閉じる。
-	if (bind(sockfd, (struct sockaddr*)&localAddr, sizeof(localAddr)) != -1)
-	{
-		cerr << "Failed bind" << strerror(errno) << endl;
-		close(sockfd);
+    memset(&localAddr, 0, sizeof(localAddr));
+    localAddr.sin_family = AF_INET; 
+    localAddr.sin_port = htons(openPort);
+    localAddr.sin_addr.s_addr = INADDR_ANY; 
 
-		return -1;
-	}
+    if (bind(sockfd, (struct sockaddr*)&localAddr, sizeof(localAddr)) != 0) // 修正ポイント
+    {
+        cerr << "Failed bind: " << strerror(errno) << endl;
+        close(sockfd);
+        return -1;
+    }
 
-	cout << "Starting reception......" << endl;
+    cout << "Starting reception......" << endl;
 
-	while (!stopF)
-	{
-		//まだとちゅうだよーーーーーーーーーー！！！！！！！！！！！
-	}
+    while (stopF == 0)
+    {
+        result = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
 
-	return 0;
+        if (result == -1)
+        {
+            cout << "Failed reception: " << strerror(errno) << endl; // 強化
+        }
+
+        buffer[result] = '\0';
+        cout << "Received message: " << buffer << endl;
+
+        // 送信元アドレスの表示（オプション）
+        char clientIP[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
+        cout << "From IP: " << clientIP << ", Port: " << ntohs(clientAddr.sin_port) << endl;
+    }
+
+    close(sockfd); // ソケットを閉じる
+    return 0;
 }
